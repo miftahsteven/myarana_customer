@@ -1,20 +1,23 @@
-import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useEffect } from 'react';
+import Routes from './routes';
+import { AuthProvider } from './context/AuthContext';
+import { usePushNotifications } from './hooks/usePushNotifications';
 
 export default function App() {
+  const { expoPushToken, devicePushToken } = usePushNotifications();
+
+  useEffect(() => {
+    if (expoPushToken) {
+      console.log('Main App.js - Expo Push Token:', expoPushToken);
+    }
+    if (devicePushToken) {
+      console.log('Main App.js - Device Push Token:', devicePushToken);
+    }
+  }, [expoPushToken, devicePushToken]);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.js to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <AuthProvider>
+      <Routes />
+    </AuthProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

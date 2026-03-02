@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "myarana",
-    "slug": "myarana",
+    "slug": "myarana-lwhxt9-ye6koaiks-zzmq",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,10 +20,18 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.myarana.customer",
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f329fe66-f78d-4404-944e-6957ffd7beca"
+      }
+    },
+    "owner": "miftahsteven"
   }
 }

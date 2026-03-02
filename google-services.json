@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "337880147342",
+    "project_id": "myarana-app",
+    "storage_bucket": "myarana-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:337880147342:android:e1a2647ff14144a48630df",
+        "android_client_info": {
+          "package_name": "com.myarana.customer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDUAomI6tTwBNsN3cr0bFLARuAEeXFJhqE"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
