@@ -4,7 +4,8 @@ import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+//import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../../context/AuthContext';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -47,7 +48,8 @@ const loginUpdateDeviceId = async (userId, deviceId, sessionToken) => {
     : process.env.EXPO_PUBLIC_API_URL;
   try {
     // Skip jika sama dengan yang tersimpan
-    const prev = await AsyncStorage.getItem('expoPushToken');
+    //const prev = await AsyncStorage.getItem('expoPushToken');
+    const prev = await SecureStore.getItemAsync('expoPushToken');
     if (prev && prev === deviceId) {
       return;
     }
@@ -63,7 +65,8 @@ const loginUpdateDeviceId = async (userId, deviceId, sessionToken) => {
       console.warn('Update device_id failed status:', res.status);
       return;
     }
-    await AsyncStorage.setItem('expoPushToken', deviceId);
+    //await AsyncStorage.setItem('expoPushToken', deviceId);
+    await SecureStore.setItemAsync('expoPushToken', deviceId);
     console.log('Device ID updated');
   } catch (e) {
     console.warn('Update device_id error:', e.message);
@@ -113,8 +116,10 @@ const Login = ({ navigation }) => {
       let userData = response.data.data;
       
       //saat response berhasil masukan data ke async storage
-      await AsyncStorage.setItem('token', userData.session.token);
-      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      //await AsyncStorage.setItem('token', userData.session.token);
+      //await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      await SecureStore.setItemAsync('token', userData.session.token);
+      await SecureStore.setItemAsync('userData', JSON.stringify(userData));
       
       setLoading(false);
       

@@ -1,15 +1,87 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, ScrollView, TouchableOpacity, Image, Dimensions, StatusBar as RNStatusBar, Platform, Animated } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Alert, TouchableOpacity, Image, Dimensions, StatusBar as RNStatusBar, Platform, Animated } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { initializeApp, getApps } from "firebase/app";
+import { getDatabase, ref, onValue, off, set } from "firebase/database"; // ADD 
+import { COMPANY_ID, MODE, EXPO_PUBLIC_API_DEV_URL } from '@env';
+import * as SecureStore from 'expo-secure-store';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
+import { useAuth } from '../../context/AuthContext';
+
+const firebaseConfig = {
+  apiKey: "AIzaSyDLHLa9fFXErUgihSe9rslTCh5iRJZDoEM",
+  authDomain: "myarana-customer.firebaseapp.com",
+  databaseURL: "https://myarana-customer-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "myarana-customer",
+  storageBucket: "myarana-customer.firebasestorage.app",
+  messagingSenderId: "165261987152",
+  appId: "1:165261987152:web:6a628a9c9b6ddeb6a33055",
+  measurementId: "G-MRX9YY19RS"
+};
+
+const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
+const db = getDatabase(app);
+
 
 const { width } = Dimensions.get('window');
 
 const Dashboard = ({ navigation }) => {
   // Blinking animation for status dot
   const blinkAnim = useRef(new Animated.Value(1)).current;
+  const [profile, setProfile] = React.useState({});
+  const [name, setName] = React.useState('');
+  const [avatar, setAvatar] = React.useState('');
+  const [loading, setLoading] = React.useState(true);
+  const [idUser, setIdUser] = React.useState(null);
+  const [packageName, setPackageName] = React.useState(null);
+  const [packagePrice, setPackagePrice] = React.useState(null);
+  const [packageState, setPackageState] = React.useState(null);
+  const [cid, setCid] = React.useState(null);
+  const [invoice, setInvoice] = React.useState(null);
+  const [invoices, setInvoices] = React.useState([]);
+  const [invoiceId, setInvoiceId] = React.useState(null);
+  const [invoiceState, setInvoiceState] = React.useState(null);
+  const [invoiceDate, setInvoiceDate] = React.useState(null);   
+  const [invoiceAmount, setInvoiceAmount] = React.useState(null);
+  const [invoiceDueDate, setInvoiceDueDate] = React.useState(null); 
+  const { logout } = useAuth();
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      const userData = await SecureStore.getItemAsync('userData');
+      if (userData) {
+        setIdUser(JSON.parse(userData).userLoggedIn.id);
+      }
+    };
+    fetchUserData();
+  }, []);
+
+  const getProfileByFirebase = (idUser) => {
+    const urlpath = `customers/${COMPANY_ID}/${MODE}/user_profile/${idUser}`;    
+    const userRef = ref(db, urlpath);
+    onValue(userRef, (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        setProfile(data);
+        setPackageName(data.activeServices[0].name);
+        setPackagePrice(data.activeServices[0].monthly_charge);
+        setPackageState(data.activeServices[0].state);
+        setName(data.identity.detailUser.complete_name);
+        setAvatar(data.identity.detailUser.avatar);
+        setInvoice(data.invoices[0].invoice);
+        setInvoices(data.invoices);
+        setInvoiceId(data.invoices[0].invoice.invoice_id);
+        setInvoiceState(data.invoices[0].detail[0]);        
+        setInvoiceAmount(data.invoices[0].invoice.invoice_total);
+        setInvoiceDueDate(data.invoices[0].invoice.invoice_due_date);
+        setCid(data.customerIdentity.cid);
+      }
+    });
+  }
 
   useEffect(() => {
     const blinkAnimation = Animated.loop(
@@ -31,6 +103,12 @@ const Dashboard = ({ navigation }) => {
     return () => blinkAnimation.stop();
   }, [blinkAnim]);
 
+  useEffect(() => {
+    if (idUser) {
+      getProfileByFirebase(idUser);
+    }
+  }, [idUser]);
+
   // Menu Grid Data
   const menuItems = [
     { id: 1, title: 'Tagihan', icon: 'receipt-outline', library: 'Ionicons', color: '#fff', bg: '#00A3FF' },
@@ -43,6 +121,18 @@ const Dashboard = ({ navigation }) => {
     { id: 8, title: 'Lainnya', icon: 'grid', library: 'Ionicons', color: '#fff', bg: '#8E8E93' }, // Gray
   ];
 
+  const formatNumberWithCommas = (number) => {
+    if (!number) return '0';
+    return number.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  };
+
+  const formatDate = (dateString) => {
+    //return format date monthName 4 digit year
+    const date = new Date(dateString);
+    const options = { year: 'numeric', month: 'long', day: 'numeric' };
+    return date.toLocaleDateString('id-ID', options);
+  };
+
   const renderIcon = (item) => {
     // Ensuring consistent sizing
     const ICON_SIZE = 24;
@@ -50,6 +140,76 @@ const Dashboard = ({ navigation }) => {
     if (item.library === 'MaterialIcons') return <MaterialCommunityIcons name={item.icon} size={ICON_SIZE} color={item.color} />; 
     return <Ionicons name={item.icon} size={ICON_SIZE} color={item.color} />;
   };
+
+  const handleDownloadTagihan = async () => {
+    console.log(invoiceId);
+
+    if (!invoiceId) {
+      Alert.alert('Informasi', 'ID Tagihan tidak ditemukan.');
+      return;
+    }
+
+    setLoading(true);
+    try {
+        const token = await SecureStore.getItemAsync('token');
+        const API_CONFIG = process.env.EXPO_PUBLIC_API_CONFIG;
+        const BASE_URL = API_CONFIG === 'DEV' 
+            ? process.env.EXPO_PUBLIC_API_DEV_URL 
+            : process.env.EXPO_PUBLIC_API_URL;  
+      
+      const response = await fetch(`${BASE_URL}/invoices/export_pdf/${invoiceId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      });
+      const data = await response.json().catch(() => null);
+      
+      if (response.ok) {
+        const fileUri = `${FileSystem.documentDirectory}Tagihan_${invoiceId}.pdf`;
+        const downloadResult = await FileSystem.downloadAsync(
+          `${BASE_URL}/invoices/export_pdf/${invoiceId}`,
+          fileUri,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`
+            }
+          }
+        );
+        console.log(downloadResult);
+
+        if (downloadResult.status === 200) {
+          await Sharing.shareAsync(fileUri, {
+            mimeType: 'application/pdf',
+            dialogTitle: 'Bagikan Tagihan',
+          });
+        } else {
+          Alert.alert('Gagal', 'Gagal mengunduh tagihan.');
+        }
+      } else {
+        if (response.status === 401 || (data?.success === "false" && data?.message === "Sesi berakhir!")) {
+          Alert.alert('Sesi Berakhir', 'Sesi Anda telah berakhir, silakan login kembali.', [
+            {
+              text: 'OK',
+              onPress: async () => {
+                await SecureStore.deleteItemAsync('token');
+                await SecureStore.deleteItemAsync('userData');
+                await logout();
+              }
+            }
+          ]);
+          return;
+        }
+        Alert.alert('Gagal', data?.message || 'Gagal mengunduh tagihan.');
+      }
+
+      
+    } catch (error) {
+      console.error('Error downloading invoice:', error);
+      Alert.alert('Gagal', 'Terjadi kesalahan saat mengunduh tagihan.');
+    } finally {
+      setLoading(false);
+    }
+  };    
 
   return (
     <View style={styles.container}>
@@ -69,13 +229,23 @@ const Dashboard = ({ navigation }) => {
         <View style={styles.header}>
             <View style={styles.headerLeft}>
                 <TouchableOpacity onPress={() => navigation.navigate('Profile')}>
+                    {
+                        avatar?
                     <Image 
-                        source={{ uri: 'https://ui-avatars.com/api/?name=Steve+Job&background=random&color=fff' }} 
+                        source={{ uri: EXPO_PUBLIC_API_DEV_URL+avatar }} 
+                        style={styles.avatar} 
+                    /> : 
+                    <Image 
+                        source={{ uri: 'https://ui-avatars.com/api/?name='+name+'&background=random&color=fff' }} 
                         style={styles.avatar} 
                     />
+                    }
                 </TouchableOpacity>
                 <View style={styles.userInfo}>
-                    <Text style={styles.userName}>Steve</Text>
+                    {/* 
+                    sesuaikan text size nama dengan dimension device
+                    */}
+                    <Text style={styles.userName}>{name}</Text>
                     <TouchableOpacity style={styles.poinContainer}>
                         <Text style={styles.userPoin}>976 arana poin</Text>
                         <Ionicons name="chevron-forward" size={12} color="#efebefff" />
@@ -111,7 +281,7 @@ const Dashboard = ({ navigation }) => {
                             <Text style={styles.actionText}>Detail</Text>
                             <Ionicons name="eye-off-outline" size={16} color="#6a366aff" style={{marginLeft: 4}} />
                         </TouchableOpacity> */}
-                        <TouchableOpacity style={styles.actionLink}>
+                        <TouchableOpacity onPress={handleDownloadTagihan} style={styles.actionLink}>
                              <Text style={styles.actionText}>Download Tagihan</Text>
                              <Ionicons name="download-outline" size={16} color="#6a366aff" style={{marginLeft: 4}} />
                         </TouchableOpacity>
@@ -121,25 +291,52 @@ const Dashboard = ({ navigation }) => {
                 {/* Account Details */}
                 <View style={styles.accountContainer}>
                     <View style={styles.accountInfo}>
-                         <Text style={styles.accountName}>Arana Fiber Home</Text>
-                         <Text style={styles.accountNumber}>ID: 123456789</Text>
+                         <Text style={styles.accountName}>{packageName}</Text>
+                         <Text style={styles.accountNumber}>ID: {cid}</Text>
                     </View>
-                    <View style={styles.accountStatus}>
-                         <View style={styles.statusBadge}>
-                             <Animated.View style={[styles.statusDot, { opacity: blinkAnim }]} />
-                             <Text style={styles.statusText}>Aktif</Text>
-                         </View>
-                    </View>
+                    {
+                        packageState === 'Terblokir' ? (
+                            <View style={styles.accountStatus}>
+                                 <View style={[styles.statusBadge, { backgroundColor: '#F2F2F2' }]}>
+                                    <Text style={[styles.statusText, { color: '#FF3B30' }]}>{packageState}</Text>
+                                 </View>
+                            </View>
+                        ) : packageState === 'Belum dibayar' ? (
+                            <View style={styles.accountStatus}>
+                                 <View style={[styles.statusBadge, { backgroundColor: '#FFFFFF', borderColor: '#E5E5EA', borderWidth: 1 }]}>
+                                    <View style={[styles.statusDot, { backgroundColor: '#000000', overflow: 'hidden' }]}>
+                                        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#FF3B30', opacity: blinkAnim }]} />
+                                    </View>
+                                    <Text style={[styles.statusText, { color: '#FF3B30' }]}>{packageState}</Text>
+                                 </View>
+                            </View>
+                        ) : packageState === 'Aktif' ? (
+                            <View style={styles.accountStatus}>
+                                 <View style={[styles.statusBadge, { backgroundColor: '#F2F2F2' }]}>
+                                    <View style={[styles.statusDot, { backgroundColor: '#FF9F0A', overflow: 'hidden' }]}>
+                                        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#34C759', opacity: blinkAnim }]} />
+                                    </View>
+                                    <Text style={[styles.statusText, { color: '#34C759' }]}>{packageState}</Text>
+                                 </View>
+                            </View>
+                        ) : null
+                    }
                 </View>
 
                 {/* Bill / Balance */}
-                <View style={styles.billContainer}>
-                     <Text style={styles.currency}>Rp</Text>
-                     <Text style={styles.billAmount}>350.000</Text>
-                </View>
-                <View style={styles.billDateContainer}>
-                    <Text style={styles.billDate}>*Jatuh Tempo 8 Maret 2026</Text>
-                </View>
+                {invoices.length > 0 ? (
+                    <>
+                        <View style={styles.billContainer}>
+                            <Text style={styles.currency}>Rp</Text>
+                            <Text style={styles.billAmount}>
+                                {formatNumberWithCommas(invoiceAmount)}
+                            </Text>
+                        </View>
+                        <View style={styles.billDateContainer}>
+                            <Text style={styles.billDate}>*Jatuh Tempo {formatDate(invoiceDueDate)}</Text>
+                        </View>
+                    </>
+                ) : null}
                 
                 <TouchableOpacity style={styles.payButton}>
                     <Text style={styles.payButtonText}>Bayar Tagihan</Text>
@@ -231,7 +428,8 @@ const styles = StyleSheet.create({
       marginLeft: 12,
   },
   userName: {
-      fontSize: 18,
+      //buatkan fontSize dinamis sesuai dengan lebar device
+      fontSize: width * 0.035,
       fontWeight: 'bold',
       color: '#673284ff',
   },
@@ -311,21 +509,26 @@ const styles = StyleSheet.create({
       fontWeight: '600',
   },
   accountContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      marginBottom: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
   },
   accountName: {
-      fontSize: 16,
+      fontSize: 13,
       color: '#3A3A3C',
       marginBottom: 4,
   },
   accountNumber: {
-      fontSize: 14,
-      color: '#8E8E93',
+    fontSize: 14,
+    color: '#8E8E93',
+  },
+  accountInfo: {
+    flex: 1,
   },
   accountStatus: {
-      justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8, // gap between CID and status badge
+    marginTop: 0,
   },
   statusBadge: {
       flexDirection: 'row',

@@ -32,6 +32,9 @@
         "projectId": "f329fe66-f78d-4404-944e-6957ffd7beca"
       }
     },
-    "owner": "miftahsteven"
+    "owner": "miftahsteven",
+    "plugins": [
+      "expo-secure-store"
+    ]
   }
 }

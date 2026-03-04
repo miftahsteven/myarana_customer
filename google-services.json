@@ -1,13 +1,33 @@
 {
   "project_info": {
-    "project_number": "337880147342",
-    "project_id": "myarana-app",
-    "storage_bucket": "myarana-app.firebasestorage.app"
+    "project_number": "165261987152",
+    "firebase_url": "https://myarana-customer-default-rtdb.asia-southeast1.firebasedatabase.app",
+    "project_id": "myarana-customer",
+    "storage_bucket": "myarana-customer.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:337880147342:android:e1a2647ff14144a48630df",
+        "mobilesdk_app_id": "1:165261987152:android:0a2760d468f11d13a33055",
+        "android_client_info": {
+          "package_name": "com.myarana.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBBo8aZ6NFBErr32_TeiJMpbg0L0UbPltw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:165261987152:android:71b67feb26f838fda33055",
         "android_client_info": {
           "package_name": "com.myarana.customer"
         }
@@ -15,7 +35,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDUAomI6tTwBNsN3cr0bFLARuAEeXFJhqE"
+          "current_key": "AIzaSyBBo8aZ6NFBErr32_TeiJMpbg0L0UbPltw"
         }
       ],
       "services": {

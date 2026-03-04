@@ -2,7 +2,8 @@ import React, { useEffect } from 'react';
 import { StyleSheet, View, Text, ImageBackground, TouchableOpacity, Dimensions } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+//import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../../context/AuthContext';
 
 const { width } = Dimensions.get('window');
@@ -12,7 +13,7 @@ const Onboarding = ({ navigation }) => {
 
   const handleStart = async () => {
     try {
-      const result = await AsyncStorage.getItem('userData');
+      const result = await SecureStore.getItemAsync('userData');
       if (result) {
         // user is already logged in, set global context
         // this will trigger the root index.js to switch to AppStack (Dashboard)
@@ -26,7 +27,7 @@ const Onboarding = ({ navigation }) => {
 
   const handleButtonNext = async () => {
     try {
-      const result = await AsyncStorage.getItem('userData');
+      const result = await SecureStore.getItemAsync('userData');
       if (result) {
         // user is already logged in, set global context
         // this will trigger the root index.js to switch to AppStack (Dashboard)

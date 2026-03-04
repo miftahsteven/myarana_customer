@@ -10,7 +10,7 @@ import {
   Image,
   ActivityIndicator,
 } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as SecureStore from 'expo-secure-store';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import axios from 'axios';
@@ -28,7 +28,7 @@ const Profile = ({ navigation }) => {
 
   useEffect(() => {
     const loadUserData = async () => {
-      const data = await AsyncStorage.getItem('userData');
+      const data = await SecureStore.getItemAsync('userData');
       if (data) {
         const userData = JSON.parse(data);
         const nama = userData.userLoggedInDetail.complete_name;
@@ -44,7 +44,7 @@ const Profile = ({ navigation }) => {
   const handleLogout = async () => {
     setLoading(true);
     try {      
-      const token = await AsyncStorage.getItem('token');
+      const token = await SecureStore.getItemAsync('token');
       const API_CONFIG = process.env.EXPO_PUBLIC_API_CONFIG;
       const BASE_URL = API_CONFIG === 'DEV' 
         ? process.env.EXPO_PUBLIC_API_DEV_URL 
@@ -58,7 +58,7 @@ const Profile = ({ navigation }) => {
       // do nothing
     } finally {
       // Always clear local storage and trigger global auth state change
-      await AsyncStorage.multiRemove(['token', 'userData']);
+      await SecureStore.multiRemove(['token', 'userData']);
       setLoading(false);
       logout(); // triggers root navigator to switch to AuthStack -> Login
     }
