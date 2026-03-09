@@ -1,26 +1,30 @@
 import React, { useEffect, useRef } from 'react';
-import { StyleSheet, View, Text, ScrollView, Alert, TouchableOpacity, Image, Dimensions, StatusBar as RNStatusBar, Platform, Animated } from 'react-native';
+import { StyleSheet, View, Text, ScrollView, Alert, TouchableOpacity, Image, Dimensions, StatusBar as RNStatusBar, Platform, Animated, Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons, MaterialCommunityIcons, FontAwesome5 } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { initializeApp, getApps } from "firebase/app";
-import { getDatabase, ref, onValue, off, set } from "firebase/database"; // ADD 
-import { COMPANY_ID, MODE, EXPO_PUBLIC_API_DEV_URL } from '@env';
+import { getDatabase, ref, onValue, off, set } from "firebase/database"; // ADD
+import { 
+  COMPANY_ID, MODE, EXPO_PUBLIC_API_DEV_URL,
+  FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN, FIREBASE_DATABASE_URL, 
+  FIREBASE_PROJECT_ID, FIREBASE_STORAGE_BUCKET, FIREBASE_MESSAGING_SENDER_ID, 
+  FIREBASE_APP_ID, FIREBASE_MEASUREMENT_ID 
+} from '@env';
 import * as SecureStore from 'expo-secure-store';
-import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import { useAuth } from '../../context/AuthContext';
+import * as Notifications from 'expo-notifications';
 
 const firebaseConfig = {
-  apiKey: "AIzaSyDLHLa9fFXErUgihSe9rslTCh5iRJZDoEM",
-  authDomain: "myarana-customer.firebaseapp.com",
-  databaseURL: "https://myarana-customer-default-rtdb.asia-southeast1.firebasedatabase.app",
-  projectId: "myarana-customer",
-  storageBucket: "myarana-customer.firebasestorage.app",
-  messagingSenderId: "165261987152",
-  appId: "1:165261987152:web:6a628a9c9b6ddeb6a33055",
-  measurementId: "G-MRX9YY19RS"
+  apiKey: FIREBASE_API_KEY,
+  authDomain: FIREBASE_AUTH_DOMAIN,
+  databaseURL: FIREBASE_DATABASE_URL,
+  projectId: FIREBASE_PROJECT_ID,
+  storageBucket: FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: FIREBASE_MESSAGING_SENDER_ID,
+  appId: FIREBASE_APP_ID,
+  measurementId: FIREBASE_MEASUREMENT_ID
 };
 
 const app = getApps().length ? getApps()[0] : initializeApp(firebaseConfig);
@@ -29,18 +33,48 @@ const db = getDatabase(app);
 
 const { width } = Dimensions.get('window');
 
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
+
+async function setupNotifications() {
+  const { status } = await Notifications.getPermissionsAsync();
+  if (status !== 'granted') {
+    const req = await Notifications.requestPermissionsAsync();
+    if (req.status !== 'granted') return;
+  }
+  if (Platform.OS === 'android') {
+    await Notifications.setNotificationChannelAsync('default', {
+      name: 'default',
+      importance: Notifications.AndroidImportance.MAX,
+      vibrationPattern: [200, 100, 200, 100, 200],
+      lightColor: '#6621817c',  
+      sound: 'notification.wav',
+      lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+    });    
+  }
+}
+
 const Dashboard = ({ navigation }) => {
   // Blinking animation for status dot
   const blinkAnim = useRef(new Animated.Value(1)).current;
+  const serviceTabsRef = useRef(null);
   const [profile, setProfile] = React.useState({});
   const [name, setName] = React.useState('');
   const [avatar, setAvatar] = React.useState('');
   const [loading, setLoading] = React.useState(true);
   const [idUser, setIdUser] = React.useState(null);
+  const [activeServices, setActiveServices] = React.useState([]);
+  const [selectedServiceIndex, setSelectedServiceIndex] = React.useState(0);
   const [packageName, setPackageName] = React.useState(null);
   const [packagePrice, setPackagePrice] = React.useState(null);
   const [packageState, setPackageState] = React.useState(null);
   const [cid, setCid] = React.useState(null);
+  const [sid, setSid] = React.useState(null);
   const [invoice, setInvoice] = React.useState(null);
   const [invoices, setInvoices] = React.useState([]);
   const [invoiceId, setInvoiceId] = React.useState(null);
@@ -48,7 +82,13 @@ const Dashboard = ({ navigation }) => {
   const [invoiceDate, setInvoiceDate] = React.useState(null);   
   const [invoiceAmount, setInvoiceAmount] = React.useState(null);
   const [invoiceDueDate, setInvoiceDueDate] = React.useState(null); 
+  const [unreadNotifCount, setUnreadNotifCount] = React.useState(0);
+  const [poin, setPoin] = React.useState(0);
   const { logout } = useAuth();
+
+  useEffect(() => {
+    setupNotifications();
+  }, []);
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -67,21 +107,58 @@ const Dashboard = ({ navigation }) => {
       const data = snapshot.val();
       if (data) {
         setProfile(data);
-        setPackageName(data.activeServices[0].name);
-        setPackagePrice(data.activeServices[0].monthly_charge);
-        setPackageState(data.activeServices[0].state);
-        setName(data.identity.detailUser.complete_name);
-        setAvatar(data.identity.detailUser.avatar);
-        setInvoice(data.invoices[0].invoice);
-        setInvoices(data.invoices);
-        setInvoiceId(data.invoices[0].invoice.invoice_id);
-        setInvoiceState(data.invoices[0].detail[0]);        
-        setInvoiceAmount(data.invoices[0].invoice.invoice_total);
-        setInvoiceDueDate(data.invoices[0].invoice.invoice_due_date);
-        setCid(data.customerIdentity.cid);
+        
+        if (data.activeServices && data.activeServices.length > 0) {
+            setActiveServices(data.activeServices);
+            // Default to first service
+            setPackageName(data.activeServices[0]?.name);
+            setPackagePrice(data.activeServices[0]?.monthly_charge);
+            setPackageState(data.activeServices[0]?.state);
+            setSid(data.activeServices[0]?.sid);
+        }
+
+        if (data.identity && data.identity.detailUser) {
+            setName(data.identity.detailUser?.complete_name || '');
+            setAvatar(data.identity.detailUser?.avatar || '');
+            setPoin(data.identity.detailUser?.poin || 0);
+        }
+        
+        if (data.invoices && data.invoices.length > 0) {
+            setInvoice(data.invoices[0]?.invoice);
+            setInvoices(data.invoices);
+            setInvoiceId(data.invoices[0]?.invoice?.invoice_id);
+            if (data.invoices[0]?.detail && data.invoices[0].detail.length > 0) {
+                setInvoiceState(data.invoices[0].detail[0]);        
+            }
+            setInvoiceAmount(data.invoices[0]?.invoice?.invoice_total);
+            setInvoiceDueDate(data.invoices[0]?.invoice?.invoice_due_date);
+        } else {
+            setInvoices([]);
+        }
+
+        setCid(data.customerIdentity?.cid);
+
+        // Also get unread notif count
+        if (data.notifications && data.notifications.unread) {
+            setUnreadNotifCount(data.notifications.unread);
+        } else {
+            setUnreadNotifCount(0);
+        }
       }
     });
   }
+
+  // Switch displayed service when user picks a different tab
+  const handleSelectService = (index) => {
+    setSelectedServiceIndex(index);
+    const svc = activeServices[index];
+    if (svc) {
+      setPackageName(svc.name);
+      setPackagePrice(svc.monthly_charge);
+      setPackageState(svc.state);
+      setSid(svc.sid);
+    }
+  };
 
   useEffect(() => {
     const blinkAnimation = Animated.loop(
@@ -109,16 +186,27 @@ const Dashboard = ({ navigation }) => {
     }
   }, [idUser]);
 
+  // One-shot swipe hint when multiple services are loaded
+  useEffect(() => {
+    if (activeServices.length > 1 && serviceTabsRef.current) {
+      const timer = setTimeout(() => {
+        serviceTabsRef.current?.scrollTo({ x: 70, animated: true });
+        setTimeout(() => {
+          serviceTabsRef.current?.scrollTo({ x: 0, animated: true });
+        }, 450);
+      }, 900);
+      return () => clearTimeout(timer);
+    }
+  }, [activeServices.length]);
+
   // Menu Grid Data
   const menuItems = [
-    { id: 1, title: 'Tagihan', icon: 'receipt-outline', library: 'Ionicons', color: '#fff', bg: '#00A3FF' },
-    { id: 2, title: 'History Transaksi', icon: 'history', library: 'MaterialCommunityIcons', color: '#fff', bg: '#FF9F0A' }, // Warning orange
-    { id: 3, title: 'Tiket', icon: 'ticket-confirmation', library: 'MaterialCommunityIcons', color: '#fff', bg: '#30D158' }, // Success green
-    { id: 4, title: 'Ubah Paket', icon: 'cube', library: 'Ionicons', color: '#fff', bg: '#BF5AF2' }, // Purple
-    { id: 5, title: 'Speedtest', icon: 'speedometer', library: 'MaterialCommunityIcons', color: '#fff', bg: '#FF453A' }, // Red
-    { id: 6, title: 'Info', icon: 'information-outline', library: 'MaterialCommunityIcons', color: '#fff', bg: '#64D2FF' }, // Light Blue
-    { id: 7, title: 'Video', icon: 'play-circle', library: 'Ionicons', color: '#fff', bg: '#FF375F' }, // Pink
-    { id: 8, title: 'Lainnya', icon: 'grid', library: 'Ionicons', color: '#fff', bg: '#8E8E93' }, // Gray
+    { id: 1, title: 'Tagihan', icon: 'receipt-outline', bgColor: '#1E88E5', onPress: () => navigation.navigate('MyInvoices') },
+    { id: 2, title: 'Riwayat Transaksi', icon: 'time-outline', bgColor: '#F57F17', onPress: () => navigation.navigate('HistoryTransactions') },
+    { id: 3, title: 'Tambah Layanan', icon: 'add-circle-outline', bgColor: '#43A047', onPress: () => navigation.navigate('AddService') },
+    { id: 4, title: 'SpeedTest', icon: 'speedometer-outline', bgColor: '#D81B60', onPress: () => navigation.navigate('SpeedTest') },
+    { id: 5, title: 'Chat Support', icon: 'chatbubbles-outline', bgColor: '#00ACC1', onPress: () => navigation.navigate('MainTabs', { screen: 'Chat' }) },
+    { id: 6, title: 'Info', icon: 'information-circle-outline', bgColor: '#8E24AA', onPress: () => navigation.navigate('Informations') },
   ];
 
   const formatNumberWithCommas = (number) => {
@@ -134,11 +222,8 @@ const Dashboard = ({ navigation }) => {
   };
 
   const renderIcon = (item) => {
-    // Ensuring consistent sizing
-    const ICON_SIZE = 24;
-    if (item.library === 'MaterialCommunityIcons') return <MaterialCommunityIcons name={item.icon} size={ICON_SIZE} color={item.color} />;
-    if (item.library === 'MaterialIcons') return <MaterialCommunityIcons name={item.icon} size={ICON_SIZE} color={item.color} />; 
-    return <Ionicons name={item.icon} size={ICON_SIZE} color={item.color} />;
+    // Removed, replaced with Image
+    return null;
   };
 
   const handleDownloadTagihan = async () => {
@@ -157,52 +242,42 @@ const Dashboard = ({ navigation }) => {
             ? process.env.EXPO_PUBLIC_API_DEV_URL 
             : process.env.EXPO_PUBLIC_API_URL;  
       
-      const response = await fetch(`${BASE_URL}/invoices/export_pdf/${invoiceId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
-      });
-      const data = await response.json().catch(() => null);
-      
-      if (response.ok) {
-        const fileUri = `${FileSystem.documentDirectory}Tagihan_${invoiceId}.pdf`;
-        const downloadResult = await FileSystem.downloadAsync(
-          `${BASE_URL}/invoices/export_pdf/${invoiceId}`,
-          fileUri,
-          {
+        const response = await fetch(`${BASE_URL}/invoices/export_pdf/${invoiceId}`, {
             headers: {
-              Authorization: `Bearer ${token}`
+                Authorization: `Bearer ${token}`
             }
-          }
-        );
-        console.log(downloadResult);
+        });
+        const data = await response.json().catch(() => null);  
 
-        if (downloadResult.status === 200) {
-          await Sharing.shareAsync(fileUri, {
-            mimeType: 'application/pdf',
-            dialogTitle: 'Bagikan Tagihan',
-          });
+        console.log("file", token);
+        
+
+        if (response.ok) {
+            const url = data.data.file;
+            const supported = await Linking.canOpenURL(url);
+            
+            if (supported) {
+                await Linking.openURL(url);
+            } else {
+                Alert.alert('Gagal', 'Tidak dapat membuka browser untuk mengunduh tagihan.');
+            }
         } else {
-          Alert.alert('Gagal', 'Gagal mengunduh tagihan.');
-        }
-      } else {
-        if (response.status === 401 || (data?.success === "false" && data?.message === "Sesi berakhir!")) {
-          Alert.alert('Sesi Berakhir', 'Sesi Anda telah berakhir, silakan login kembali.', [
-            {
-              text: 'OK',
-              onPress: async () => {
-                await SecureStore.deleteItemAsync('token');
-                await SecureStore.deleteItemAsync('userData');
-                await logout();
-              }
+            if (response.status === 401 || (data?.success === "false" && data?.message === "Sesi berakhir!")) {
+                Alert.alert('Sesi Berakhir', 'Sesi Anda telah berakhir, silakan login kembali.', [
+                    {
+                        text: 'OK',
+                        onPress: async () => {
+                            await SecureStore.deleteItemAsync('token');
+                            await SecureStore.deleteItemAsync('userData');
+                            await logout();
+                        }
+                    }
+                ]);
+                return;
             }
-          ]);
-          return;
+            Alert.alert('Gagal', data?.message || 'Gagal mengunduh tagihan.');
         }
-        Alert.alert('Gagal', data?.message || 'Gagal mengunduh tagihan.');
-      }
 
-      
     } catch (error) {
       console.error('Error downloading invoice:', error);
       Alert.alert('Gagal', 'Terjadi kesalahan saat mengunduh tagihan.');
@@ -210,6 +285,81 @@ const Dashboard = ({ navigation }) => {
       setLoading(false);
     }
   };    
+
+  const handlePayTagihan = async () => {
+    console.log(invoiceId);
+
+    if (!invoiceId) {
+      Alert.alert('Informasi', 'ID Tagihan tidak ditemukan.');
+      return;
+    }
+
+    const token = await SecureStore.getItemAsync('token');
+    const API_CONFIG = process.env.EXPO_PUBLIC_API_CONFIG;
+    const BASE_URL = API_CONFIG === 'DEV' 
+        ? process.env.EXPO_PUBLIC_API_DEV_URL 
+        : process.env.EXPO_PUBLIC_API_URL;  
+
+    const response = await fetch(`${BASE_URL}/invoices/pay_now/${invoiceId}`, {
+        headers: {
+            Authorization: `Bearer ${token}`
+        }
+    });
+
+    const data = await response.json().catch(() => null);  
+
+    console.log("data", data);
+
+    if (response.ok) {
+        const redirect_url = data.data.redirect_url;
+
+        //open redirect ke routes SnapPayment
+        navigation.navigate('SnapPayment', { url: redirect_url });
+
+    }
+
+  };    
+
+  const handleLogout = async () => {
+    Alert.alert(
+      "Konfirmasi Keluar",
+      "Apakah Anda yakin ingin keluar dari aplikasi?",
+      [
+        { text: "Batal", style: "cancel" },
+        { text: "Ya", onPress: handleLogoutConfirm, style: "destructive" }
+      ]
+    );
+  };
+
+  const handleLogoutConfirm = async () => {
+    setLoading(true);
+    try {      
+      const token = await SecureStore.getItemAsync('token');
+      const API_CONFIG = process.env.EXPO_PUBLIC_API_CONFIG;
+      const BASE_URL = API_CONFIG === 'DEV' 
+        ? process.env.EXPO_PUBLIC_API_DEV_URL 
+        : process.env.EXPO_PUBLIC_API_URL;
+
+        //console.log("token", token);
+        
+      
+      // Best-effort API logout, ignore errors (e.g. 401 expired token)
+      const logout = await axios.get(`${BASE_URL}/auth/mobile/logout`, {
+        headers: { Authorization: `Bearer ${token}` },
+
+      }).catch(() => {}); // silently ignore API errors
+      //console.log("logout", logout);
+    } catch (error) {
+      // do nothing
+    } finally {
+      // Always clear local storage and trigger global auth state change
+      // await SecureStore.multiRemove(['token', 'userData']);
+       await SecureStore.deleteItemAsync('token');
+       await SecureStore.deleteItemAsync('userData');
+      setLoading(false);
+      logout(); // triggers root navigator to switch to AuthStack -> Login
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -246,21 +396,38 @@ const Dashboard = ({ navigation }) => {
                     sesuaikan text size nama dengan dimension device
                     */}
                     <Text style={styles.userName}>{name}</Text>
-                    <TouchableOpacity style={styles.poinContainer}>
-                        <Text style={styles.userPoin}>976 arana poin</Text>
-                        <Ionicons name="chevron-forward" size={12} color="#efebefff" />
-                    </TouchableOpacity>
+                    {cid ? (
+                        <TouchableOpacity style={styles.poinContainer}>
+                            <Ionicons name="barcode-outline" size={12} color="#e8d4f0ff" style={{ marginRight: 4 }} />
+                            <Text style={styles.userPoin}>{cid}</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <TouchableOpacity 
+                            style={styles.noServiceLink}
+                            onPress={() => navigation.navigate('AddService')}
+                        >
+                            <Ionicons name="link-outline" size={12} color="#FF9F0A" style={{ marginRight: 4 }} />
+                            <Text style={styles.noServiceLinkText}>Tambah Layanan</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
             <View style={styles.headerRight}>
-                <TouchableOpacity style={styles.iconButton}>
+                <TouchableOpacity 
+                    style={styles.iconButton} 
+                    onPress={() => navigation.navigate('NotificationsInbox')}
+                >
                     <Ionicons name="mail-outline" size={24} color="#6a366aff" />
-                    <View style={styles.badge} />
+                    {unreadNotifCount > 0 && (
+                        <View style={styles.badge}>
+                            <Text style={styles.badgeText}>{unreadNotifCount}</Text>
+                        </View>
+                    )}
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
+                {/* <TouchableOpacity style={styles.iconButton}>
                     <Ionicons name="settings-outline" size={24} color="#6a366aff" />
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.iconButton}>
+                </TouchableOpacity> */}
+                <TouchableOpacity onPress={handleLogout} style={styles.iconButton}>
                      <Ionicons name="log-out-outline" size={24} color="#6a366aff" />
                 </TouchableOpacity>
             </View>
@@ -276,71 +443,140 @@ const Dashboard = ({ navigation }) => {
             <View style={styles.card}>
                 <View style={styles.cardHeader}>
                     <Text style={styles.cardTitle}>Status Paket</Text>
-                    <View style={styles.cardActions}>
-                        {/* <TouchableOpacity style={styles.actionLink}>
-                            <Text style={styles.actionText}>Detail</Text>
-                            <Ionicons name="eye-off-outline" size={16} color="#6a366aff" style={{marginLeft: 4}} />
-                        </TouchableOpacity> */}
-                        <TouchableOpacity onPress={handleDownloadTagihan} style={styles.actionLink}>
-                             <Text style={styles.actionText}>Download Tagihan</Text>
-                             <Ionicons name="download-outline" size={16} color="#6a366aff" style={{marginLeft: 4}} />
-                        </TouchableOpacity>
-                    </View>
+                    {packageName && invoiceAmount ? (
+                      <View style={styles.cardActions}>
+                          <TouchableOpacity onPress={handleDownloadTagihan} style={styles.actionLink}>
+                               <Text style={styles.actionText}>Download Tagihan</Text>
+                               <Ionicons name="download-outline" size={16} color="#6a366aff" style={{marginLeft: 4}} />
+                          </TouchableOpacity>
+                      </View>
+                    ) : null}
                 </View>
 
-                {/* Account Details */}
-                <View style={styles.accountContainer}>
-                    <View style={styles.accountInfo}>
-                         <Text style={styles.accountName}>{packageName}</Text>
-                         <Text style={styles.accountNumber}>ID: {cid}</Text>
-                    </View>
-                    {
-                        packageState === 'Terblokir' ? (
-                            <View style={styles.accountStatus}>
-                                 <View style={[styles.statusBadge, { backgroundColor: '#F2F2F2' }]}>
-                                    <Text style={[styles.statusText, { color: '#FF3B30' }]}>{packageState}</Text>
-                                 </View>
-                            </View>
-                        ) : packageState === 'Belum dibayar' ? (
-                            <View style={styles.accountStatus}>
-                                 <View style={[styles.statusBadge, { backgroundColor: '#FFFFFF', borderColor: '#E5E5EA', borderWidth: 1 }]}>
-                                    <View style={[styles.statusDot, { backgroundColor: '#000000', overflow: 'hidden' }]}>
-                                        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#FF3B30', opacity: blinkAnim }]} />
-                                    </View>
-                                    <Text style={[styles.statusText, { color: '#FF3B30' }]}>{packageState}</Text>
-                                 </View>
-                            </View>
-                        ) : packageState === 'Aktif' ? (
-                            <View style={styles.accountStatus}>
-                                 <View style={[styles.statusBadge, { backgroundColor: '#F2F2F2' }]}>
-                                    <View style={[styles.statusDot, { backgroundColor: '#FF9F0A', overflow: 'hidden' }]}>
-                                        <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#34C759', opacity: blinkAnim }]} />
-                                    </View>
-                                    <Text style={[styles.statusText, { color: '#34C759' }]}>{packageState}</Text>
-                                 </View>
-                            </View>
-                        ) : null
-                    }
-                </View>
-
-                {/* Bill / Balance */}
-                {invoices.length > 0 ? (
-                    <>
-                        <View style={styles.billContainer}>
-                            <Text style={styles.currency}>Rp</Text>
-                            <Text style={styles.billAmount}>
-                                {formatNumberWithCommas(invoiceAmount)}
+                {packageName ? (
+                  <>
+                    {/* Multi-service tab selector — only shown when there are multiple services */}
+                    {activeServices.length > 1 && (
+                      <ScrollView 
+                        ref={serviceTabsRef}
+                        horizontal 
+                        showsHorizontalScrollIndicator={false}
+                        style={styles.serviceTabsScroll}
+                        contentContainerStyle={styles.serviceTabsContent}
+                      >
+                        {activeServices.map((svc, idx) => (
+                          <TouchableOpacity
+                            key={idx}
+                            style={[
+                              styles.serviceTab,
+                              selectedServiceIndex === idx && styles.serviceTabActive
+                            ]}
+                            onPress={() => handleSelectService(idx)}
+                          >
+                            <Ionicons 
+                              name="wifi" 
+                              size={12} 
+                              color={selectedServiceIndex === idx ? '#fff' : '#673284ff'} 
+                              style={{ marginRight: 5 }}
+                            />
+                            <Text style={[
+                              styles.serviceTabText,
+                              selectedServiceIndex === idx && styles.serviceTabTextActive
+                            ]}>
+                              {svc.name || `Layanan ${idx + 1}`}
                             </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    )}
+
+                    {/* Account Details */}
+                    <View style={styles.accountContainer}>
+
+                        <View style={styles.accountInfo}>
+                             <Text style={styles.accountName}>{packageName}</Text>
+                             <Text style={styles.accountNumber}>ID: {sid}</Text>
                         </View>
-                        <View style={styles.billDateContainer}>
-                            <Text style={styles.billDate}>*Jatuh Tempo {formatDate(invoiceDueDate)}</Text>
+                        {
+                            packageState === 'Terblokir' ? (
+                                <View style={styles.accountStatus}>
+                                     <View style={[styles.statusBadge, { backgroundColor: '#F2F2F2' }]}>
+                                        <Text style={[styles.statusText, { color: '#FF3B30' }]}>{packageState}</Text>
+                                     </View>
+                                </View>
+                            ) : packageState === 'Belum dibayar' ? (
+                                <View style={styles.accountStatus}>
+                                     <View style={[styles.statusBadge, { backgroundColor: '#FFFFFF', borderColor: '#E5E5EA', borderWidth: 1 }]}>
+                                        <View style={[styles.statusDot, { backgroundColor: '#000000', overflow: 'hidden' }]}>
+                                            <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#FF3B30', opacity: blinkAnim }]} />
+                                        </View>
+                                        <Text style={[styles.statusText, { color: '#FF3B30' }]}>{packageState}</Text>
+                                     </View>
+                                </View>
+                            ) : packageState === 'Aktif' ? (
+                                <View style={styles.accountStatus}>
+                                     <View style={[styles.statusBadge, { backgroundColor: '#F2F2F2' }]}>
+                                        <View style={[styles.statusDot, { backgroundColor: '#FF9F0A', overflow: 'hidden' }]}>
+                                            <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#34C759', opacity: blinkAnim }]} />
+                                        </View>
+                                        <Text style={[styles.statusText, { color: '#34C759' }]}>{packageState}</Text>
+                                     </View>
+                                </View>
+                            ) : null
+                        }
+                    </View>
+
+                    {/* Bill / Balance */}
+                    {invoices.length > 0 ? (
+                        <>
+                            <View style={styles.billContainer}>
+                                <Text style={styles.currency}>Rp</Text>
+                                <Text style={styles.billAmount}>
+                                    {formatNumberWithCommas(invoiceAmount)}
+                                </Text>
+                            </View>
+                            <View style={styles.billDateContainer}>
+                                <Text style={styles.billDate}>*Jatuh Tempo {formatDate(invoiceDueDate)}</Text>
+                            </View>
+                        </>
+                    ) : null}
+                    
+                    {invoiceAmount ? (
+                        <TouchableOpacity onPress={handlePayTagihan} style={styles.payButton}>
+                            <Text style={styles.payButtonText}>Bayar Tagihan</Text>
+                        </TouchableOpacity>
+                    ) : (
+                        <View style={styles.paidStatusRow}>
+                            <View style={styles.paidStatusIcon}>
+                                <Ionicons name="checkmark-circle" size={18} color="#34C759" />
+                            </View>
+                            <Text style={styles.paidStatusText}>Tagihan Lunas</Text>
+                            <Text style={styles.paidStatusSub}>Belum ada tagihan</Text>
                         </View>
-                    </>
-                ) : null}
-                
-                <TouchableOpacity style={styles.payButton}>
-                    <Text style={styles.payButtonText}>Bayar Tagihan</Text>
-                </TouchableOpacity>
+                    )}
+                  </>
+                ) : (
+                  <View style={styles.noServiceContainer}>
+                      <View style={styles.noServiceIcon}>
+                          <Ionicons name="alert-circle-outline" size={36} color="#FF9F0A" />
+                      </View>
+                      <Text style={styles.noServiceText}>Belum Ada Layanan / Tagihan</Text>
+                      <Text style={styles.noServiceSubText}>Hubungkan akun Anda dengan ID Pelanggan untuk melihat tagihan bulanan dan status paket Anda.</Text>
+                      <TouchableOpacity 
+                          style={styles.addServiceBtn}
+                          onPress={() => navigation.navigate('AddService')}
+                      >
+                          <LinearGradient
+                              colors={['#673284ff', '#1b060aff']}
+                              style={styles.addServiceGradient}
+                              start={{x: 0, y: 0}} end={{x: 1, y: 0}}
+                          >
+                              <Ionicons name="add-circle-outline" size={20} color="#fff" style={{marginRight: 6}} />
+                              <Text style={styles.addServiceBtnText}>Hubungkan Layanan</Text>
+                          </LinearGradient>
+                      </TouchableOpacity>
+                  </View>
+                )}
             </View>
 
             {/* Menu Grid Card (Transaksi Favorit Style) */}
@@ -353,34 +589,79 @@ const Dashboard = ({ navigation }) => {
                     </TouchableOpacity> */}
                 </View>
 
-                <View style={styles.menuGrid}>
-                    {menuItems.map((item) => (
-                        <TouchableOpacity key={item.id} style={styles.menuItem}>
-                            <View style={[styles.iconCircle, { backgroundColor: item.bg }]}>
-                                {renderIcon(item)}
-                            </View>
-                            <Text style={styles.menuTitle}>{item.title}</Text>
-                        </TouchableOpacity>
-                    ))}
+                <View style={styles.menuGridWrapper}>
+                    <View style={styles.menuGrid}>
+                        {menuItems.map((item) => (
+                            <TouchableOpacity onPress={item.onPress} key={item.id} style={styles.menuItem}>
+                                <View style={[styles.menuIconContainer, { backgroundColor: item.bgColor }]}>
+                                    <Ionicons name={item.icon} size={28} color="#FFF" />
+                                </View>
+                                <Text numberOfLines={2} style={styles.menuTitle}>{item.title}</Text>
+                            </TouchableOpacity>
+                        ))}
+                    </View>
                 </View>
             </View>
 
-            {/* Promo Section (Spesial Untuk Anda) */}
+            {/* Promo Section (Kelebihan Layanan) */}
             <View style={[styles.card, styles.lastCard]}>
-                <Text style={styles.cardTitle}>Spesial Untuk Anda</Text>
+                <Text style={styles.cardTitle}>Keunggulan Arana</Text>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.promoScroll}>
-                    {[1, 2, 3].map((i) => (
-                        <TouchableOpacity key={i} style={styles.promoCard}>
-                            <LinearGradient
-                                colors={['#673284ff', '#1b060aff']}
-                                style={styles.promoGradient}
-                                start={{x:0, y:0}} end={{x:1, y:1}}
-                            >
-                                <Text style={styles.promoText}>Promo {i}</Text>
-                                <Text style={styles.promoSub}>Diskon 50%!</Text>
-                            </LinearGradient>
-                        </TouchableOpacity>
-                    ))}
+                    
+                    {/* Card 1: Support 24 Jam */}
+                    <TouchableOpacity style={styles.promoCard}>
+                        <LinearGradient
+                            colors={['#673284ff', '#1b060aff']}
+                            style={styles.promoGradient}
+                            start={{x:0, y:0}} end={{x:1, y:1}}
+                        >
+                            <Image 
+                                source={require('../../assets/images/support_operator.png')} 
+                                style={styles.promoImage} 
+                            />
+                            <View style={styles.promoTextContainer}>
+                                <Text style={styles.promoText}>Support 24 Jam</Text>
+                                <Text style={styles.promoSub} numberOfLines={2}>Layanan bantuan siap sedia kapan pun Anda butuhkan.</Text>
+                            </View>
+                        </LinearGradient>
+                    </TouchableOpacity>
+
+                    {/* Card 2: Paket Pilihan */}
+                    <TouchableOpacity style={styles.promoCard}>
+                        <LinearGradient
+                            colors={['#673284ff', '#1b060aff']}
+                            style={styles.promoGradient}
+                            start={{x:0, y:0}} end={{x:1, y:1}}
+                        >
+                            <Image 
+                                source={require('../../assets/images/internet_packages.png')} 
+                                style={styles.promoImage} 
+                            />
+                            <View style={styles.promoTextContainer}>
+                                <Text style={styles.promoText}>Bebas Pilih Paket</Text>
+                                <Text style={styles.promoSub} numberOfLines={2}>Pilihan kecepatan dan harga yang pas untuk setiap rumah.</Text>
+                            </View>
+                        </LinearGradient>
+                    </TouchableOpacity>
+
+                    {/* Card 3: Koneksi Stabil */}
+                    <TouchableOpacity style={styles.promoCard}>
+                        <LinearGradient
+                            colors={['#673284ff', '#1b060aff']}
+                            style={styles.promoGradient}
+                            start={{x:0, y:0}} end={{x:1, y:1}}
+                        >
+                            <Image 
+                                source={require('../../assets/images/fast_connection.png')} 
+                                style={styles.promoImage} 
+                            />
+                            <View style={styles.promoTextContainer}>
+                                <Text style={styles.promoText}>Koneksi Stabil</Text>
+                                <Text style={styles.promoSub} numberOfLines={2}>Streaming, gaming, dan browsing lancar tanpa hambatan.</Text>
+                            </View>
+                        </LinearGradient>
+                    </TouchableOpacity>
+
                 </ScrollView>
             </View>
 
@@ -448,6 +729,22 @@ const styles = StyleSheet.create({
       marginRight: 4,
       fontWeight: '600',
   },
+  noServiceLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: 'rgba(255, 159, 10, 0.15)',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: 12,
+      marginTop: 4,
+      borderWidth: 1,
+      borderColor: 'rgba(255, 159, 10, 0.4)',
+  },
+  noServiceLinkText: {
+      fontSize: 11,
+      color: '#FF9F0A',
+      fontWeight: '700',
+  },
   headerRight: {
       flexDirection: 'row',
   },
@@ -457,14 +754,22 @@ const styles = StyleSheet.create({
   },
   badge: {
       position: 'absolute',
-      top: 0,
-      right: -2,
-      width: 8,
-      height: 8,
-      borderRadius: 4,
+      top: -4,
+      right: -8,
+      minWidth: 16,
+      minHeight: 16,
+      borderRadius: 8,
       backgroundColor: '#FF3B30',
       borderWidth: 1.5,
       borderColor: '#0085FF',
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: 4,
+  },
+  badgeText: {
+      color: '#FFF',
+      fontSize: 10,
+      fontWeight: 'bold',
   },
   scrollView: {
       flex: 1,
@@ -598,34 +903,132 @@ const styles = StyleSheet.create({
       fontSize: 16,      
       fontWeight: 'bold',
   },
+  paidStatusRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderTopWidth: 1,
+      borderTopColor: '#F2F2F2',
+      marginTop: 5,
+  },
+  paidStatusIcon: {
+      marginRight: 8,
+  },
+  paidStatusText: {
+      fontSize: 14,
+      fontWeight: 'bold',
+      color: '#34C759',
+      marginRight: 8,
+  },
+  paidStatusSub: {
+      fontSize: 12,
+      color: '#8E8E93',
+      flex: 1,
+  },
+  serviceTabsScroll: {
+      marginBottom: 14,
+  },
+  serviceTabsContent: {
+      flexDirection: 'row',
+      paddingRight: 4,
+  },
+  serviceTab: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 6,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderColor: '#673284ff',
+      marginRight: 8,
+      backgroundColor: 'transparent',
+  },
+  serviceTabActive: {
+      backgroundColor: '#673284ff',
+      borderColor: '#673284ff',
+  },
+  serviceTabText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: '#673284ff',
+  },
+  serviceTabTextActive: {
+      color: '#fff',
+  },
+  noServiceContainer: {
+      alignItems: 'center',
+      paddingVertical: 15,
+  },
+  noServiceIcon: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      backgroundColor: '#FFF5E5',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: 16,
+  },
+  noServiceText: {
+      fontSize: 18,
+      fontWeight: 'bold',
+      color: '#1C1C1E',
+      marginBottom: 8,
+  },
+  noServiceSubText: {
+      fontSize: 13,
+      color: '#8E8E93',
+      textAlign: 'center',
+      marginBottom: 24,
+      lineHeight: 20,
+      paddingHorizontal: 15,
+  },
+  addServiceBtn: {
+      width: '100%',
+      borderRadius: 12,
+      overflow: 'hidden',
+  },
+  addServiceGradient: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+  },
+  addServiceBtnText: {
+      color: '#fff',
+      fontSize: 15,
+      fontWeight: 'bold',
+  },
+  menuGridWrapper: {
+      alignItems: 'center', // Center the grid container to elegantly handle small number of items
+      marginTop: 15,
+  },
   menuGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      justifyContent: 'space-between',
+      justifyContent: 'flex-start',
+      width: '100%',
+      paddingHorizontal: 5,
   },
   menuItem: {
-      width: '23%', 
+      width: '33.33%', // 3 items per row, optimal layout for 6 items (2 rows perfectly balanced)
       alignItems: 'center',
       marginBottom: 20,
   },
-  iconCircle: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      justifyContent: 'center',
+  menuIconContainer: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: '#f6f2f9', // Light purple background to match app theme
       alignItems: 'center',
+      justifyContent: 'center',
       marginBottom: 8,
-      // Create that soft glowing feel or just solid color
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.1,
-      shadowRadius: 4,
-      elevation: 2,
   },
   menuTitle: {
-      fontSize: 12,
+      fontSize: 11,
       color: '#3A3A3C',
+      fontWeight: '600',
       textAlign: 'center',
+      paddingHorizontal: 4,
   },
   lastCard: {
       marginBottom: 100, // Space for bottom tabs
@@ -644,17 +1047,39 @@ const styles = StyleSheet.create({
   },
   promoGradient: {
       flex: 1,
-      padding: 16,
       justifyContent: 'flex-end',
+      position: 'relative',
+  },
+  promoImage: {
+      position: 'absolute',
+      right: -20,
+      bottom: -10,
+      width: 140,
+      height: 140,
+      opacity: 0.35, // Decreased opacity significantly to make the background darker
+      resizeMode: 'contain',
+  },
+  promoTextContainer: {
+      padding: 16,
+      width: '75%', // allows a bit more room for text
+      zIndex: 1,
   },
   promoText: {
       color: '#fff',
-      fontSize: 18,
+      fontSize: 17,
       fontWeight: 'bold',
+      marginBottom: 3,
+      textShadowColor: 'rgba(0, 0, 0, 0.75)', // Added text shadow for legibility
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 3,
   },
   promoSub: {
-      color: '#fff',
-      opacity: 0.9,
+      color: '#eefeef',
+      fontSize: 12,
+      lineHeight: 16,
+      textShadowColor: 'rgba(0, 0, 0, 0.65)', // Added text shadow for legibility
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 2,
   },
 });
 

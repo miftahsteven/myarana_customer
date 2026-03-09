@@ -9,12 +9,25 @@ import * as SecureStore from 'expo-secure-store';
 import { useAuth } from '../../context/AuthContext';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
+import Constants from 'expo-constants';
 
 const EAS_PROJECT_ID = process.env.EXPO_PUBLIC_EAS_PROJECT_ID || '28bab746-b073-4544-8482-bcec0ef4eb0b';
+
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowAlert: true,
+    shouldPlaySound: true,
+    shouldSetBadge: false,
+  }),
+});
 
 Notifications.setNotificationChannelAsync('default', {
   name: 'default',
   importance: Notifications.AndroidImportance.MAX,
+  vibrationPattern: [200, 100, 200, 100, 200],
+  lightColor: '#6621817c',  
+  sound: 'notification.wav',
+  lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
 });
 
 // Get device push token
@@ -32,7 +45,13 @@ const getExpoPushTokenSafe = async () => {
     }
     if (finalStatus !== 'granted') return null;
 
-    const token = await Notifications.getExpoPushTokenAsync({ projectId: EAS_PROJECT_ID });
+    const projectId = Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
+    if (!projectId) {
+        console.warn('EAS Project ID not found!');
+        return null;
+    }
+
+    const token = await Notifications.getExpoPushTokenAsync({ projectId });
     return token.data;
   } catch (error) {
     console.error('Error getting Expo Push Token:', error);

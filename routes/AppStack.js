@@ -3,7 +3,7 @@ import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { View, Text, StyleSheet, Platform } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import Dashboard from '../app/screens/Dashboard';
-import MyPackage from '../app/screens/MyPackage';
+import MyPackage from '../app/screens/Service/MyPackage';
 import Product from '../app/screens/Product';
 import Chat from '../app/screens/Chat';
 
