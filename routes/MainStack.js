@@ -10,6 +10,7 @@ import AddService from '../app/screens/Service/AddService';
 import HistoryTransactions from '../app/screens/Service/HistoryTransactions';
 import MyInvoices from '../app/screens/Service/MyInvoices';
 import Informations from '../app/screens/Service/Informations';
+import AccountDeletion from '../app/screens/Service/AccountDeletion';
 
 const Stack = createNativeStackNavigator();
 
@@ -29,6 +30,7 @@ const MainStack = () => {
       <Stack.Screen name="HistoryTransactions" component={HistoryTransactions} />
       <Stack.Screen name="MyInvoices" component={MyInvoices} />
       <Stack.Screen name="Informations" component={Informations} />
+      <Stack.Screen name="AccountDeletion" component={AccountDeletion} /> 
     </Stack.Navigator>
   );
 };

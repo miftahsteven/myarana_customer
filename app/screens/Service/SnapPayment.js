@@ -13,7 +13,7 @@ const SnapPayment = ({ navigation, route }) => {
         <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Snap Payment</Text>
+        <Text style={styles.headerTitle}>Pembayaran</Text>
         {/* Spacer for centering title */}
         <View style={{ width: 40 }} />
       </View>

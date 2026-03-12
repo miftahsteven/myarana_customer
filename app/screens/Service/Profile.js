@@ -503,7 +503,7 @@ const Profile = ({ navigation }) => {
         </View>
 
         <View style={styles.formCard}>
-          <View style={styles.inputGroup}>
+          {/* <View style={styles.inputGroup}>
             <Text style={styles.label}>Nama Lengkap</Text>
             <View style={styles.inputContainer}>
               <Ionicons name="person-outline" size={20} color="#673284ff" />
@@ -514,7 +514,7 @@ const Profile = ({ navigation }) => {
                 onChangeText={(text) => setUserData({...userData, nama: text})}
               />
             </View>
-          </View>
+          </View> */}
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>Email</Text>
@@ -577,6 +577,17 @@ const Profile = ({ navigation }) => {
             <View style={styles.row}>
               <Ionicons name="log-out-outline" size={20} color="#673284ff" />
               <Text style={styles.changePasswordText}>Keluar Akun</Text>
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="#CCC" />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.changePasswordLink}
+            onPress={() => navigation.navigate('AccountDeletion')}
+          >
+            <View style={styles.row}>
+              {/* Icon harus ada hubungannya dengan account dan hapus account. Seperti gambar people di coret.*/}
+              <Ionicons name="person-remove-outline" size={20} color="#673284ff" />
+              <Text style={styles.changePasswordText}>Hapus Akun</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#CCC" />
           </TouchableOpacity>
