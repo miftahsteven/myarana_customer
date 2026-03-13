@@ -70,13 +70,16 @@ const ServiceListScreen = ({ navigation }) => {
       const token = await SecureStore.getItemAsync('token');
       const response = await fetch(`${BASE_URL}/auth/mobile/add_services`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        headers: { 
+          'Content-Type': 'application/json', 
+          'Authorization': `Bearer ${token}` 
+        },
         body: JSON.stringify({ key: inputValue }),
       });
       const result = await response.json();
-
-      console.log("result", result);
-      console.log("response", response);      
+      //console.log("token", token);
+      ///console.log("result", result);
+      //console.log("response", response);      
       if (response.ok) {
         Alert.alert('Berhasil', 'Layanan berhasil ditambahkan ke akun anda.');
         setModalVisible(false);

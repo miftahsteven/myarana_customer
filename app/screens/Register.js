@@ -110,13 +110,15 @@ const Register = ({ navigation }) => {
       setLoading(true);
       try {
         // Hit API Saat klik "Selanjutnya" di Step 2 (Tanpa mengirimkan parameter OTP)
-        await axios.post(`${BASE_URL}/auth/mobile/customer/registration`, {
+        const response = await axios.post(`${BASE_URL}/auth/mobile/customer/registration`, {
           email: formData.email,
           phone_number: formData.phone,
           name: formData.name,
           password: formData.password,
           confirmPassword: formData.confirmPassword
         });
+        
+        //console.log("log register", JSON.stringify(response.data));
         
         setLoading(false);
         setStep(3); // Pindah ke layar OTP
