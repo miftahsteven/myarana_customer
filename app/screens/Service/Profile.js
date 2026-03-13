@@ -84,6 +84,12 @@ const Profile = ({ navigation }) => {
   // OTP Timer States
   const [countdown, setCountdown] = useState(60);
   const [canResend, setCanResend] = useState(false);
+  const [urlPath, setUrlPath] = useState('');
+
+  const API_CONFIG = process.env.EXPO_PUBLIC_API_CONFIG;
+  const BASE_URL = API_CONFIG === 'DEV' 
+    ? process.env.EXPO_PUBLIC_API_DEV_URL 
+    : process.env.EXPO_PUBLIC_API_URL;  
 
   useEffect(() => {
     let timer;
@@ -478,7 +484,7 @@ const Profile = ({ navigation }) => {
               {
                 avatar ? (
                   <Image 
-                    source={{ uri: EXPO_PUBLIC_API_DEV_URL+avatar }} 
+                    source={{ uri: BASE_URL+avatar }} 
                     style={styles.avatar} 
                   />
                 ) : (

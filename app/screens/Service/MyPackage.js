@@ -139,6 +139,15 @@ const MyPackage = ({ navigation }) => {
                   <Text style={[styles.statusText, { color: '#FF3B30' }]}>{state}</Text>
               </View>
           );
+      } else if (state === "Belum aktif") {
+        return (
+            <View style={[styles.statusBadge, { backgroundColor: '#F2F2F2' }]}>
+                <View style={[styles.statusDot, { backgroundColor: '#FF9F0A', overflow: 'hidden' }]}>
+                    <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#FF3B30', opacity: blinkAnim }]} />
+                </View>
+                <Text style={[styles.statusText, { color: '#FF3B30' }]}>{state || 'Aktif'}</Text>
+            </View>
+        );
       } else {
           // Default to Aktif style
           return (

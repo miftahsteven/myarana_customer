@@ -100,6 +100,8 @@ const ServiceListScreen = ({ navigation }) => {
     const userRef = ref(db, urlpath);
     const unsubscribe = onValue(userRef, (snapshot) => {
       const data = snapshot.val();
+      console.log("data services", JSON.stringify(data));
+      
       if (data) {
         if (data.activeServices && data.activeServices.length > 0) {
             setServices(data.activeServices);

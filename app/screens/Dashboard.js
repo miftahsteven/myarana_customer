@@ -522,6 +522,15 @@ const Dashboard = ({ navigation }) => {
                                         <Text style={[styles.statusText, { color: '#34C759' }]}>{packageState}</Text>
                                      </View>
                                 </View>
+                            ) : packageState === 'Belum aktif' ? (
+                                <View style={styles.accountStatus}>
+                                     <View style={[styles.statusBadge, { backgroundColor: '#FFFFFF', borderColor: '#E5E5EA', borderWidth: 1 }]}>
+                                        <View style={[styles.statusDot, { backgroundColor: '#000000', overflow: 'hidden' }]}>
+                                            <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#FF3B30', opacity: blinkAnim }]} />
+                                        </View>
+                                        <Text style={[styles.statusText, { color: '#FF3B30' }]}>{packageState}</Text>
+                                     </View>
+                                </View>
                             ) : null
                         }
                     </View>
