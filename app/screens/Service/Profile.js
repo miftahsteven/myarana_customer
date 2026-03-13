@@ -504,7 +504,7 @@ const Profile = ({ navigation }) => {
               )}
             </TouchableOpacity>
           </View>
-          <Text style={styles.profileName}>{userData.nama || 'Steve Job'}</Text>
+          <Text style={styles.profileName}>{userData.nama || 'No Name'}</Text>
           <Text style={styles.profileTagline}>{cid}</Text>
         </View>
 
