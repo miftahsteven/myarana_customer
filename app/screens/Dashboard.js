@@ -86,6 +86,12 @@ const Dashboard = ({ navigation }) => {
   const [poin, setPoin] = React.useState(0);
   const { logout } = useAuth();
 
+  const API_CONFIG = process.env.EXPO_PUBLIC_API_CONFIG;
+    const BASE_URL = API_CONFIG === 'DEV' 
+      ? process.env.EXPO_PUBLIC_API_DEV_URL 
+      : process.env.EXPO_PUBLIC_API_URL;  
+  
+
   useEffect(() => {
     setupNotifications();
   }, []);
@@ -382,7 +388,7 @@ const Dashboard = ({ navigation }) => {
                     {
                         avatar?
                     <Image 
-                        source={{ uri: EXPO_PUBLIC_API_DEV_URL+avatar }} 
+                        source={{ uri: BASE_URL+avatar }} 
                         style={styles.avatar} 
                     /> : 
                     <Image 
