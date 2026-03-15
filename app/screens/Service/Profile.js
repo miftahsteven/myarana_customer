@@ -592,7 +592,7 @@ const Profile = ({ navigation }) => {
           >
             <View style={styles.row}>
               {/* Icon harus ada hubungannya dengan account dan hapus account. Seperti gambar people di coret.*/}
-              <Ionicons name="person-remove-outline" size={20} color="#673284ff" />
+              <Ionicons name="warning" size={20} color="#673284ff" />
               <Text style={styles.changePasswordText}>Hapus Akun</Text>
             </View>
             <Ionicons name="chevron-forward" size={18} color="#CCC" />
@@ -905,6 +905,7 @@ const styles = StyleSheet.create({
   saveProfileText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
   changePasswordLink: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, paddingHorizontal: 15, borderTopWidth: 1, borderTopColor: '#F2F2F2', marginTop: 10 },
   row: { flexDirection: 'row', alignItems: 'center' },
+  rowAlertHapusAkun: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 15, paddingHorizontal: 15, borderTopWidth: 1, borderTopColor: '#F2F2F2', marginTop: 10, backgroundColor: '#673284ff' },
   changePasswordText: { fontSize: 14, fontWeight: 'bold', color: '#673284ff', marginLeft: 10 },
   footer: { paddingHorizontal: 20, marginTop: 15, alignItems: 'center' },
   logoutTextBtn: { paddingVertical: 10, paddingHorizontal: 20 },

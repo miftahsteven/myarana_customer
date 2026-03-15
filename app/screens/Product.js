@@ -101,7 +101,7 @@ const Product = ({ navigation }) => {
                       <Text style={styles.headerTitle}>Layanan Internet</Text>
                       <Text style={styles.headerSubtitle}>Temukan paket internet terbaik untuk Anda</Text>
                   </View>
-                  <Ionicons name="cart-outline" size={26} color="#FFF" style={styles.headerIcon} />
+                  <Ionicons name="cube-outline" size={26} color="#FFF" style={styles.headerIcon} />
               </View>
           </SafeAreaView>
       </LinearGradient>
