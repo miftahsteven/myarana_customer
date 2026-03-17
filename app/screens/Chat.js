@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -14,11 +14,14 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  Animated,
+  BackHandler,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { StatusBar } from 'expo-status-bar';
 import * as SecureStore from 'expo-secure-store';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { initializeApp, getApps } from 'firebase/app';
 import { getDatabase, ref, onValue } from 'firebase/database';
 import {
@@ -62,6 +65,8 @@ const Chat = () => {
   const [isKeyboardVisible, setKeyboardVisible] = useState(false);
   const [isMenuVisible, setMenuVisible] = useState(false);
   const flatListRef = useRef(null);
+  const keyboardAnim = useRef(new Animated.Value(0)).current;
+  const navigation = useNavigation();
 
   // Load user ID from SecureStore
   useEffect(() => {
@@ -112,15 +117,32 @@ const Chat = () => {
     }
   }, [messages]);
 
-  // Listen to keyboard to adjust bottom padding dynamically
+  // Handle Android back button — navigate to Dashboard
+  useFocusEffect(
+    useCallback(() => {
+      const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+        navigation.navigate('Dashboard');
+        return true;
+      });
+      return () => backHandler.remove();
+    }, [navigation])
+  );
+
+  // Listen to keyboard visibility
   useEffect(() => {
     const showSub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      () => setKeyboardVisible(true)
+      (e) => {
+        setKeyboardVisible(true);
+        if (Platform.OS === 'android') keyboardAnim.setValue(e.endCoordinates.height);
+      }
     );
     const hideSub = Keyboard.addListener(
       Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => setKeyboardVisible(false)
+      () => {
+        setKeyboardVisible(false);
+        if (Platform.OS === 'android') keyboardAnim.setValue(0);
+      }
     );
     return () => {
       showSub.remove();
@@ -165,17 +187,16 @@ const Chat = () => {
         ? process.env.EXPO_PUBLIC_API_DEV_URL
         : process.env.EXPO_PUBLIC_API_URL;
 
-      const closing = await fetch(`${BASE_URL}/bots/close`, {
+      await fetch(`${BASE_URL}/bots/close`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
       });
-//      console.log("closing", closing);
-      
-      setMenuVisible(false); // Tutup menu setelah diklik
-      // Optional: navigation.goBack() jika setelah tutup otomatis kembali
+
+      setMenuVisible(false);
+      navigation.navigate('Dashboard');
     } catch (err) {
       console.error('Failed to close conversation:', err);
     }
@@ -374,9 +395,16 @@ const Chat = () => {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        behavior="padding"
+        enabled={Platform.OS === 'ios'}
+        keyboardVerticalOffset={0}
       >
+        <Animated.View
+          style={Platform.OS === 'android'
+            ? [styles.flex, { paddingBottom: keyboardAnim }]
+            : styles.flex
+          }
+        >
         {/* Messages */}
         <FlatList
           ref={flatListRef}
@@ -389,7 +417,6 @@ const Chat = () => {
             messages.length === 0 && styles.messagesListEmpty,
           ]}
           ListEmptyComponent={
-            // ScaleY(-1) to fix inverted empty state
             <View style={{ transform: [{ scaleY: -1 }] }}>
               <EmptyState />
             </View>
@@ -398,10 +425,7 @@ const Chat = () => {
         />
 
         {/* Input bar */}
-        <View style={[
-          styles.inputBar,
-          isKeyboardVisible && { paddingBottom: 10 }
-        ]}>
+        <View style={styles.inputBar}>
           <View style={styles.inputWrapper}>
             <TextInput
               style={styles.textInput}
@@ -428,6 +452,7 @@ const Chat = () => {
             )}
           </TouchableOpacity>
         </View>
+        </Animated.View>
       </KeyboardAvoidingView>
     </View>
   );
@@ -637,8 +662,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     paddingHorizontal: 12,
     paddingTop: 10,
-    // Default padding untuk memunculkan background putih di balik floating tab bar
-    paddingBottom: Platform.OS === 'ios' ? 90 : 120,
+    paddingBottom: Platform.OS === 'ios' ? 30 : 60,
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: '#EBEBF0',

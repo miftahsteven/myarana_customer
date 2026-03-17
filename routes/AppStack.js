@@ -60,7 +60,7 @@ const AppStack = () => {
       <Tab.Screen name="Dashboard" component={Dashboard} options={{ title: 'Beranda' }} />
       <Tab.Screen name="MyPackage" component={MyPackage} options={{ title: 'Paket Saya' }} />
       <Tab.Screen name="Product" component={Product} options={{ title: 'Produk' }} />
-      <Tab.Screen name="Chat" component={Chat} options={{ title: 'Chat' }} />
+      <Tab.Screen name="Chat" component={Chat} options={{ title: 'Chat', tabBarStyle: { display: 'none' } }} />
     </Tab.Navigator>
   );
 };
