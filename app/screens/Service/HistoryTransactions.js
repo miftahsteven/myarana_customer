@@ -59,21 +59,20 @@ const HistoryTransactions = () => {
       const json = await response.json();
 
       //console.log("JSON", json.data.results);
-      
-      
+            
       // Sesuaikan pembacaan JSON berdasarkan format respons API Anda.
-      // Asumsi format standar: { data: { results: [] } } atau list langsung
-      let newTransactions = json.data?.results || json.data || json || [];
+      // Pastikan kita mengambil array hasil (results) atau array langsung dari data.
+      let newTransactions = [];
       
-      // Pastikan newTransactions adalah sebuah array.
-      // Apabila responsenya berbentuk Object (misalnya { "1": {..}, "2": {..} }), ubah menjadi array.
-      if (!Array.isArray(newTransactions)) {
-        if (typeof newTransactions === 'object' && newTransactions !== null) {
-          newTransactions = Object.values(newTransactions);
-        } else {
-          newTransactions = [];
-        }
+      if (json.data && Array.isArray(json.data.results)) {
+        newTransactions = json.data.results;
+      } else if (Array.isArray(json.data)) {
+        newTransactions = json.data;
+      } else if (Array.isArray(json)) {
+        newTransactions = json;
       }
+      // Kita tidak lagi melakukan Object.values(json.data) secara sembarangan 
+      // untuk menghindari data status/meta dianggap sebagai baris transaksi.
 
       if (pageNumber === 1) {
         setData(newTransactions);
@@ -142,14 +141,14 @@ const HistoryTransactions = () => {
     if (s.includes('pending') || s.includes('waiting')) return 'Tertunda';
     if (s.includes('fail') || s.includes('cancel')) return 'Gagal';
     // Capitalize first letter as fallback
-    if (!state) return 'Unknown';
+    if (!state) return '';
     return state.charAt(0).toUpperCase() + state.slice(1);
   };
 
   const renderItem = ({ item }) => {
     const date = item.created_at;
     const status = item.state;
-    const desc = item.description || 'Transaksi';
+    const desc = item.description || '';
 
     return (
       <View style={styles.cardContainer}>

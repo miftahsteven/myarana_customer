@@ -448,7 +448,7 @@ const Dashboard = ({ navigation }) => {
             {/* Main Account Card (Rekening Style) */}
             <View style={styles.card}>
                 <View style={styles.cardHeader}>
-                    <Text style={styles.cardTitle}>Status Paket</Text>
+                    <Text style={styles.cardTitle}>Status Layanan</Text>
                     {packageName && invoiceAmount ? (
                       <View style={styles.cardActions}>
                           <TouchableOpacity onPress={handleDownloadTagihan} style={styles.actionLink}>
