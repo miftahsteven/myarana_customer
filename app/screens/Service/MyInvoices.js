@@ -10,11 +10,13 @@ import {
     RefreshControl,
     Dimensions,
     Animated,
-    Alert
+    Alert,
+    Linking
 } from 'react-native';
 import * as SecureStore from 'expo-secure-store';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
+import { useAuth } from '../../../context/AuthContext';
 import { initializeApp, getApps } from "firebase/app";
 import { getDatabase, ref, onValue } from "firebase/database";
 import {
@@ -47,6 +49,7 @@ const MyInvoices = ({ navigation }) => {
     const [idUser, setIdUser] = useState(null);
     const [invoices, setInvoices] = useState([]);
     const [activeServices, setActiveServices] = useState([]);
+    const { logout } = useAuth();
 
     useEffect(() => {
         const fetchUserData = async () => {
@@ -123,6 +126,64 @@ const MyInvoices = ({ navigation }) => {
             setRefreshing(false);
         }
     }, [idUser, getInvoices, getActiveServices]);
+
+    const handleDownloadTagihan = async (id) => {
+        if (!id) {
+            Alert.alert('Informasi', 'ID Tagihan tidak ditemukan.');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const token = await SecureStore.getItemAsync('token');
+            const API_CONFIG = process.env.EXPO_PUBLIC_API_CONFIG;
+            const BASE_URL = API_CONFIG === 'DEV'
+                ? process.env.EXPO_PUBLIC_API_DEV_URL
+                : process.env.EXPO_PUBLIC_API_URL;
+
+            const response = await fetch(`${BASE_URL}/invoices/export_pdf/${id}`, {
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            });
+            const data = await response.json().catch(() => null);
+
+            console.log("file", token);
+
+
+            if (response.ok) {
+                const url = data.data.file;
+                const supported = await Linking.canOpenURL(url);
+
+                if (supported) {
+                    await Linking.openURL(url);
+                } else {
+                    Alert.alert('Gagal', 'Tidak dapat membuka browser untuk mengunduh tagihan.');
+                }
+            } else {
+                if (response.status === 401 || (data?.success === "false" && data?.message === "Sesi berakhir!")) {
+                    Alert.alert('Sesi Berakhir', 'Sesi Anda telah berakhir, silakan login kembali.', [
+                        {
+                            text: 'OK',
+                            onPress: async () => {
+                                await SecureStore.deleteItemAsync('token');
+                                await SecureStore.deleteItemAsync('userData');
+                                await logout();
+                            }
+                        }
+                    ]);
+                    return;
+                }
+                Alert.alert('Gagal', data?.message || 'Gagal mengunduh tagihan.');
+            }
+
+        } catch (error) {
+            console.error('Error downloading invoice:', error);
+            Alert.alert('Gagal', 'Terjadi kesalahan saat mengunduh tagihan.');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     const formatNumberWithCommas = (number) => {
         if (!number) return '0';
@@ -204,9 +265,9 @@ const MyInvoices = ({ navigation }) => {
                                 const details = item.detail || [];
 
                                 // Defaulting invoice_status
-                                const isPaid = invoice?.invoice_status?.toLowerCase() === 'paid' || 
-                                              invoice?.status?.toLowerCase() === 'paid';
-                                              
+                                const isPaid = invoice?.invoice_status?.toLowerCase() === 'paid' ||
+                                    invoice?.status?.toLowerCase() === 'paid';
+
                                 const invoiceId = invoice.id || invoice.invoice_id;
                                 const invoiceNumber = invoice.invoice_number || `INV-${index + 1}`;
                                 const invoiceDate = invoice.invoice_date || invoice.invoice_due_date || '-';
@@ -215,8 +276,17 @@ const MyInvoices = ({ navigation }) => {
                                 return (
                                     <View key={index} style={styles.card}>
                                         <View style={styles.cardHeader}>
-                                            <View style={styles.invoiceIconContainer}>
-                                                <Ionicons name="receipt-outline" size={24} color="#0085FF" />
+                                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                                <View style={styles.invoiceIconContainer}>
+                                                    <Ionicons name="receipt-outline" size={24} color="#0085FF" />
+                                                </View>
+                                                <TouchableOpacity
+                                                    onPress={() => handleDownloadTagihan(invoiceId)}
+                                                    style={styles.downloadBtnInline}
+                                                >
+                                                    <Ionicons name="download-outline" size={16} color="#6a366aff" />
+                                                    <Text style={styles.downloadBtnTextInline}>Download</Text>
+                                                </TouchableOpacity>
                                             </View>
                                             <View style={[styles.statusBadge, { backgroundColor: isPaid ? 'rgba(52, 199, 89, 0.1)' : 'rgba(255, 59, 48, 0.1)' }]}>
                                                 <Text style={[styles.statusText, { color: isPaid ? '#34C759' : '#FF3B30' }]}>
@@ -285,8 +355,8 @@ const MyInvoices = ({ navigation }) => {
                                     </View>
                                     <Text style={styles.noDataText}>Paket Belum Terdaftar</Text>
                                     <Text style={styles.noDataSubText}>Anda belum mendaftarkan paket anda. Silahkan hubungkan layanan anda terlebih dahulu.</Text>
-                                    
-                                    <TouchableOpacity 
+
+                                    <TouchableOpacity
                                         style={[styles.payBtn, { marginTop: 20 }]}
                                         onPress={() => navigation.navigate('AddService')}
                                     >
@@ -384,6 +454,23 @@ const styles = StyleSheet.create({
         backgroundColor: 'rgba(0, 133, 255, 0.1)',
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    downloadBtnInline: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(106, 54, 106, 0.1)',
+        paddingHorizontal: 10,
+        paddingVertical: 6,
+        borderRadius: 15,
+        marginLeft: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(106, 54, 106, 0.2)',
+    },
+    downloadBtnTextInline: {
+        fontSize: 11,
+        fontWeight: '700',
+        color: '#6a366aff',
+        marginLeft: 4,
     },
     statusBadge: {
         paddingHorizontal: 12,
